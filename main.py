@@ -4,11 +4,12 @@ import time
 import datetime
 from tkinter import *
 from threading import Timer
+import sys
 
 #GENERAL SETTINGS
 apiURL = 'http://transport.opendata.ch/v1/stationboard' #base URL for the api
 numberOfRequests = 100 #number of connections requested
-forStation = ['Cornaredo']#['Ponte Madonnetta','Universita','Corso Elvezia']
+forStation = ['Ponte Madonnetta']#['Ponte Madonnetta','Universita','Corso Elvezia']
 
 
 
@@ -139,9 +140,12 @@ def fetchNewDataForStation():
     for station in range(0,len(forStation)):
         #remove all spaces from the name of the starting station
         forStationURL = forStation[station].replace(" ","%20")
-
-        #Get the data from the URL
-        response = requests.get(apiURL + '?station=' + forStationURL + '&limit=' + str(numberOfRequests))
+        try:
+            #Get the data from the URL
+            response = requests.get(apiURL + '?station=' + forStationURL + '&limit=' + str(numberOfRequests))
+        except:
+            print("COULD NOT CONNECT TO THE NETWORK")
+            sys.exit()
         #DEBUG: Pretty print the incoming data
         #print(response.text)
         data = json.loads(response.text)
@@ -224,14 +228,16 @@ def deltaTime(timeOfDeparture):
 def updateTimeLeft():
     print("IN")
     for itemDisplayed in range(0,4):
+        print(itemDisplayed)
         newTimeLeft = deltaTime(datetime.datetime.strptime(entries[itemDisplayed]['departureTime'] + " " + entries[itemDisplayed]['departureDate'],"%H:%M:%S %Y-%m-%d"))
         if newTimeLeft <= 0:
             eliminateTop()
             itemDisplayed -= 1
         else:
             canvas.itemconfig(boundingBoxes[5+(itemDisplayed*6)],text=str(newTimeLeft))
-    timerForTimeLeft = Timer(10.0,updateTimeLeft)
-    timerForTimeLeft.start()
+    #timerForTimeLeft = Timer(10.0,updateTimeLeft)
+
+    window.after(10000,updateTimeLeft)
 
 
 def main():
