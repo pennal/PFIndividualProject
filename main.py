@@ -1,21 +1,20 @@
+# -*- coding: utf-8 -*-
 import requests#Used to request the data from the APIs
 import json #Pretty print the incoming data
-import time
 import datetime
 from tkinter import *
-from threading import Timer
 import sys
 
 #GENERAL SETTINGS
 apiURL = 'http://transport.opendata.ch/v1/stationboard' #base URL for the api
-numberOfRequests = 100 #number of connections requested
-forStation = ['Ponte Madonnetta']#['Ponte Madonnetta','Universita','Corso Elvezia']
+numberOfRequests = 30 #number of connections requested
+forStation = ['Ponte Madonnetta','Universita']
 
 
 
 #GLOBAL VARIABLES
 isIdle = True
-
+isBlinkTrue = True
 entries = [] #Variable to hold all entries
 heightOfScreen = 1050
 widthOfScreen = 1680
@@ -53,14 +52,22 @@ colorLinesARL = {
 
 entryBeingDisplayed = 0
 
-aBottomBar = 0
+fullBottomBar = ['','','']
 clock = 'hello'
 
+statusRed = '#CC0605'
+statusYellow = '#FFBE00'
+statusGreen = '#27E833'
 window = Tk()
 canvas = Canvas(window, width = widthOfScreen, height = heightOfScreen, bg = "black")
 canvas.pack()
 
 def getCorrectLineColor(lineNumber,company):
+    """
+    :param lineNumber:Line number of the bus in question
+    :param company: Company it belongs to
+    :return: (String) Hex of the color taken from the dict. If it fails (key not found) a default color is returned
+    """
     try:
         if company == 'PAG':
             return colorLinePosta
@@ -74,36 +81,62 @@ def getCorrectLineColor(lineNumber,company):
         return 'red'
 
 def addNewItemWithData(lineNumber,destination,origin,colorOfLine,position = 3):
+    """
+    :param lineNumber:Number of the line to which the bus belongs to
+    :param destination: Destination to which the bus is headed
+    :param origin: Which stop it will leave from
+    :param colorOfLine: Color of the line in question
+    :param position: Position at which the entry has to be drawn. For new items, usually 4
+    :return: VOID
+    """
     offset = position*heightOfSingleEntryBox
-
+    #changes the character size if too big
     if len(lineNumber) == 3:
         sizeOfChars = 100
     else:
         sizeOfChars = 150
-
+    #Box holding the line number, gets colored with the correct line number
     boundingBoxes.append(canvas.create_rectangle(paddingAroundBoxes+10, paddingAroundBoxes+offset+10, 220, 220+offset, fill=colorOfLine))
+    #Line number
     boundingBoxes.append(canvas.create_text(125,120+offset,text=lineNumber, font=('Helvetica Neue UltraLight',sizeOfChars),fill="white",anchor='center', tag='busNumber'))
+    #Destination String
     boundingBoxes.append(canvas.create_text(250,12+offset,text=destination, font=('Helvetica Neue UltraLight',90),fill="white",anchor='nw', tag='destination'))
+    #Station of origin
     boundingBoxes.append(canvas.create_text(250,230+offset,text=origin, font=('Helvetica Neue UltraLight',70),fill="white",anchor='sw', tag='leavingStation'))
-    boundingBoxes.append(canvas.create_oval(widthOfScreen-paddingAroundBoxes-210, paddingAroundBoxes+offset+10, widthOfScreen-paddingAroundBoxes-10, 220+offset, fill="green"))
-    boundingBoxes.append(canvas.create_text(widthOfScreen-paddingAroundBoxes-110, paddingAroundBoxes+offset+100,text='1', font=('Helvetica Neue UltraLight',100),fill="white",anchor='center', tag='timeLeft'))
+    #Circle with the status
+    boundingBoxes.append(canvas.create_oval(widthOfScreen-paddingAroundBoxes-210, paddingAroundBoxes+offset+10, widthOfScreen-paddingAroundBoxes-10, 220+offset, fill=statusGreen))
+    #Time left
+    correctTime = deltaTime(datetime.datetime.strptime(entries[position]['departureTime'] + " " + entries[position]['departureDate'],"%H:%M:%S %Y-%m-%d"))
+    #Add the time left inside the circle
+    boundingBoxes.append(canvas.create_text(widthOfScreen-paddingAroundBoxes-110, paddingAroundBoxes+offset+100,text=correctTime, font=('Helvetica Neue UltraLight',100),fill="white",anchor='center', tag='timeLeft'))
 
-    global entryBeingDisplayed
-    entryBeingDisplayed += 1
-    #global aBottomBar
-    #canvas.tag_raise(aBottomBar)
 
+    #global fullBottomBar
+    #canvas.tag_raise(fullBottomBar)
+
+
+#TODO:Remove this, only for debugging purposes
 def eliminateTopWithKey(event):
     eliminateTop()
 
+
 def eliminateTop():
+    """
+    Used when the first item has to be deleted off the top. It takes care of sliding the entry out of the way, as well
+    as generating a new entry. The list containing all the indexes is also updated and truncated.
+    :return: VOID
+    """
     if isIdle == True:
         global isIdle
         isIdle = False
         global boundingBoxes
         global entries
+        global canvas
         addNewItemWithData(entries[4]['lineNumber'],entries[4]['destination'],entries[4]['originStation'],getCorrectLineColor(entries[4]['lineNumber'],entries[4]['operator']),4)
 
+        canvas.tag_raise(fullBottomBar[0])
+        canvas.tag_raise(fullBottomBar[1])
+        canvas.tag_raise(fullBottomBar[2])
         x = 0.5
         for i in range(40):
             for item in range(0,6):
@@ -112,10 +145,7 @@ def eliminateTop():
             canvas.after(10)
             canvas.update()
         #Remove the top entry from the list of active elements
-        print("Hi1")
         boundingBoxes = boundingBoxes[6:]
-        print("Hi2")
-        print(boundingBoxes)
 
         for group in range(0,len(boundingBoxes)//6):
             i = 0
@@ -127,7 +157,7 @@ def eliminateTop():
                 canvas.after(10)
                 canvas.update()
             #compensate a bit, TODO: remove
-            for item in range(0,5):
+            for item in range(0,6):
                     canvas.move(boundingBoxes[item+(6*group)],0,+3)
 
             canvas.after(10)
@@ -135,8 +165,11 @@ def eliminateTop():
         #Remove from list of buses
         entries = entries[1:]
         isIdle = True
+
 def fetchNewDataForStation():
     global entries
+    #Create a temp dict to hold the data
+    temporaryEntries = []
     for station in range(0,len(forStation)):
         #remove all spaces from the name of the starting station
         forStationURL = forStation[station].replace(" ","%20")
@@ -149,9 +182,17 @@ def fetchNewDataForStation():
         #DEBUG: Pretty print the incoming data
         #print(response.text)
         data = json.loads(response.text)
-        #print(json.dumps(data,indent=4))
+        try:
+            amountOfData = len(data["stationboard"])
+        except KeyError:
+            print("Error: Could not find key. Might be a timeout issue, reopen the program")
+            sys.exit()
+        except:
+            print("Unknown error occured")
+            sys.exit()
+
         #Clean up the data, and extract all we need
-        for entry in range(0,len(data["stationboard"])):
+        for entry in range(0,amountOfData):
             originStation = data["station"]["name"]
             destination = data["stationboard"][entry]["to"]
             lineNumber = data["stationboard"][entry]["number"]
@@ -169,7 +210,11 @@ def fetchNewDataForStation():
             possibleDelays = data["stationboard"][entry]["stop"]["delay"]
             typeOfTransport = data["stationboard"][entry]["category"]
             operator = data["stationboard"][entry]["operator"]
-            entries.append({
+
+
+
+
+            temporaryEntries.append({
                 'originStation':originStation,
                 'destination':destination,
                 'lineNumber':lineNumber,
@@ -181,11 +226,20 @@ def fetchNewDataForStation():
                 'timeDelta':timeDelta
             })
 
-    print(json.dumps(entries,indent=4))
+    #Sort the dictionary by keys
+    temporaryEntries = quickSortTime(temporaryEntries)
+
+    print(json.dumps(temporaryEntries,indent=4))
+    print(len(temporaryEntries))
+    entries = temporaryEntries
+
+
+    #print(json.dumps(entries,indent=4))
 
 def sortByTime():
     global entries
     entries = quickSortTime(entries)
+
 
 def quickSortTime(theEntries):
     if len(theEntries) <= 1:
@@ -194,57 +248,99 @@ def quickSortTime(theEntries):
     left = []
     right = []
     for i in range(0,len(theEntries)):
-        if theEntries <= pivotVal: #TODO: DO THE CONVERSION FOR BOTH!!
+        if datetime.datetime.strptime(theEntries[i]['departureTime'] + " " + theEntries[i]['departureDate'],"%H:%M:%S %Y-%m-%d") <= datetime.datetime.strptime(pivotVal['departureTime'] + " " + pivotVal['departureDate'],"%H:%M:%S %Y-%m-%d"): #TODO: DO THE CONVERSION FOR BOTH!!
             left.append(theEntries[i])
         else:
             right.append(theEntries[i])
     return quickSortTime(left) + [pivotVal] + quickSortTime(right)
 
+
 def deltaTime(timeOfDeparture):
+    """
+    :param timeOfDeparture: Time at which the bus is supposed to depart
+    :return:(int)time left until departure
+    """
     a = datetime.datetime.now()
     c = timeOfDeparture - a
+
     res = divmod(c.days * 86400 + c.seconds, 60)
-    if res[1] > 45:
-        return res[0]+1
-    else:
-        return res[0]
+    if res[0] > 59: #More than an hour
+            return str(res[0]//60) + 'h'
+    else: #If time left is less than an hour
+        if res[1] > 45:
+            return str(res[0]+1) +'\''
+        else:
+            return str(res[0]) +'\''
 
-# def addBottomBarWithClock():
-#     global aBottomBar
-#     global clock
-#     #aBottomBar = canvas.create_rectangle(0,heightOfScreen-115, widthOfScreen, heightOfScreen, fill="#4F4F4F")
-#     clock = Label(padx=widthOfScreen//2,pady=heightOfScreen//2,text='hello', font=('Helvetica Neue UltraLight',70),anchor='se')
-#     clock.pack()
-#     #canvas.tag_raise(aBottomBar)
-#     canvas.tag_raise(clock)
 
-# def update_clock():
-#     global clock
-#     now = time.strftime("%H:%M:%S")
-#     clock.configure(text=now)
-#     window.after(1000,update_clock)
 
 
 def updateTimeLeft():
-    print("IN")
+    numberOfItemsToPopOffTop = 0
+    #Loop through the items currently displayed, and update the time for all of them
     for itemDisplayed in range(0,4):
-        print(itemDisplayed)
-        newTimeLeft = deltaTime(datetime.datetime.strptime(entries[itemDisplayed]['departureTime'] + " " + entries[itemDisplayed]['departureDate'],"%H:%M:%S %Y-%m-%d"))
-        if newTimeLeft <= 0:
-            eliminateTop()
-            itemDisplayed -= 1
-        else:
-            canvas.itemconfig(boundingBoxes[5+(itemDisplayed*6)],text=str(newTimeLeft))
-    #timerForTimeLeft = Timer(10.0,updateTimeLeft)
+        newTimeLeftAsString = deltaTime(datetime.datetime.strptime(entries[itemDisplayed]['departureTime'] + " " + entries[itemDisplayed]['departureDate'],"%H:%M:%S %Y-%m-%d"))
+        if '\'' in newTimeLeftAsString:
+            newTimeLeft = int(newTimeLeftAsString[:-1])
+        elif 'h' in newTimeLeftAsString:
+            newTimeLeft = 60 #Dummy value
 
+
+        if newTimeLeft <= 0:
+            canvas.itemconfig(boundingBoxes[5+(itemDisplayed*6)],text='0')
+            numberOfItemsToPopOffTop += 1
+        elif newTimeLeft <= 1:
+            canvas.itemconfig(boundingBoxes[4+(itemDisplayed*6)],fill=statusRed)
+            canvas.itemconfig(boundingBoxes[5+(itemDisplayed*6)],text=str(newTimeLeftAsString))
+        elif newTimeLeft <= 2:
+            canvas.itemconfig(boundingBoxes[4+(itemDisplayed*6)],fill=statusYellow)
+            canvas.itemconfig(boundingBoxes[5+(itemDisplayed*6)],text=str(newTimeLeftAsString))
+        else:
+            canvas.itemconfig(boundingBoxes[5+(itemDisplayed*6)],text=str(newTimeLeftAsString))
+
+    #Pop the item(s) to be deleted. We do it here to handle multiple ones at once
+    for i in range(0,numberOfItemsToPopOffTop):
+        eliminateTop()
+
+
+    #Schedule the update after 10 seconds
     window.after(10000,updateTimeLeft)
+
+def addBottomBarWithClock():
+    global fullBottomBar
+    global clock
+    #Add the overlay box to hide the redrawing
+    fullBottomBar[0] = canvas.create_rectangle(0,heightOfScreen-115, widthOfScreen+10, heightOfScreen+10, fill="black")
+    #Add the clock
+    fullBottomBar[1] = canvas.create_text(widthOfScreen-paddingAroundBoxes,heightOfScreen-paddingAroundBoxes,text='hh:mm', font=('Helvetica Neue UltraLight',70),fill="white",anchor='se', tag='time')
+    #Add the date
+    fullBottomBar[2] = canvas.create_text(paddingAroundBoxes,heightOfScreen-paddingAroundBoxes,text='dd/mm/yyyy', font=('Helvetica Neue UltraLight',70),fill="white",anchor='sw', tag='date')
+    canvas.tag_raise(fullBottomBar)
+
+def update_clock():
+    global fullBottomBar
+    global isBlinkTrue
+    #Get current time
+    currentDate = datetime.datetime.now()
+    stringOfTime = datetime.datetime.strftime(currentDate,"%H:%M %d/%m/%Y")
+
+    currentTime = stringOfTime.split(" ")[0]
+    currentDate = stringOfTime.split(" ")[1]
+
+    if isBlinkTrue == False:
+        currentTime = currentTime.replace(":"," ")
+    isBlinkTrue = not isBlinkTrue
+
+    canvas.itemconfig(fullBottomBar[1],text=currentTime)
+    canvas.itemconfig(fullBottomBar[2],text=currentDate)
+    window.after(1000,update_clock)
 
 
 def main():
     fetchNewDataForStation()
 
-    # addBottomBarWithClock()
-    # update_clock()
+    addBottomBarWithClock()
+    update_clock()
 
     addNewItemWithData(entries[0]['lineNumber'],entries[0]['destination'],entries[0]['originStation'],getCorrectLineColor(entries[0]['lineNumber'],entries[0]['operator']),0)
     addNewItemWithData(entries[1]['lineNumber'],entries[1]['destination'],entries[1]['originStation'],getCorrectLineColor(entries[1]['lineNumber'],entries[1]['operator']),1)
@@ -260,11 +356,16 @@ def main():
 
 
 if __name__ == "__main__":
-
-
     main()
 
-
+#TODO:Remove this, only for debugging purposes
 window.bind("<Right>", eliminateTopWithKey)
 
 window.mainloop()
+
+
+
+
+
+
+
