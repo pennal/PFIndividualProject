@@ -5,6 +5,25 @@ import datetime
 from tkinter import *
 import sys
 
+
+########################################################################################################################
+############################################## PLEASE READ BEFORE RUNNING ##############################################
+########################################################################################################################
+# In order for the program to scale correctly, it has to run on a screen that is at least 1680 x 1050, without the     #
+# dock or any other element that might shrink the screen space. This limitation might be removed in a later version.   #
+# If not used on a screen with such dimensions, some interface elements might get truncated, and the whole GUI will    #
+# fall apart. Also:                                                                                                    #
+#   - Comments are still missing in many parts of this document                                                        #
+#   - As of now, everything is in one file. Once the program works in the desired way, it will be split into multiple  #
+#     files                                                                                                            #
+#   - Code cleanliness in general will be improved once the mechanics of it are working properly                       #
+#   - Exception handling is still poor. This is on my list                                                             #
+#                                                                                                                      #
+# In order to see the animation without having to wait, the right arrow key can be pressed. This will trigger the pop  #
+########################################################################################################################
+
+
+
 #GENERAL SETTINGS
 apiURL = 'http://transport.opendata.ch/v1/stationboard' #base URL for the api
 numberOfRequests = 30 #number of connections requested
@@ -77,6 +96,8 @@ def getCorrectLineColor(lineNumber,company):
             return colorLinesARL[lineNumber]
         elif company == 'SNL Auto':
             return colorLineSNL
+        else:
+            return "red"
     except:
         return 'red'
 
@@ -114,11 +135,9 @@ def addNewItemWithData(lineNumber,destination,origin,colorOfLine,position = 3):
     #global fullBottomBar
     #canvas.tag_raise(fullBottomBar)
 
-
 #TODO:Remove this, only for debugging purposes
 def eliminateTopWithKey(event):
     eliminateTop()
-
 
 def eliminateTop():
     """
@@ -133,7 +152,7 @@ def eliminateTop():
         global entries
         global canvas
         addNewItemWithData(entries[4]['lineNumber'],entries[4]['destination'],entries[4]['originStation'],getCorrectLineColor(entries[4]['lineNumber'],entries[4]['operator']),4)
-
+        #Bring the bottom bar to the top of the view
         canvas.tag_raise(fullBottomBar[0])
         canvas.tag_raise(fullBottomBar[1])
         canvas.tag_raise(fullBottomBar[2])
@@ -229,17 +248,17 @@ def fetchNewDataForStation():
     #Sort the dictionary by keys
     temporaryEntries = quickSortTime(temporaryEntries)
 
-    print(json.dumps(temporaryEntries,indent=4))
-    print(len(temporaryEntries))
+
+
     entries = temporaryEntries
 
 
-    #print(json.dumps(entries,indent=4))
+
+
 
 def sortByTime():
     global entries
     entries = quickSortTime(entries)
-
 
 def quickSortTime(theEntries):
     if len(theEntries) <= 1:
@@ -253,7 +272,6 @@ def quickSortTime(theEntries):
         else:
             right.append(theEntries[i])
     return quickSortTime(left) + [pivotVal] + quickSortTime(right)
-
 
 def deltaTime(timeOfDeparture):
     """
@@ -271,9 +289,6 @@ def deltaTime(timeOfDeparture):
             return str(res[0]+1) +'\''
         else:
             return str(res[0]) +'\''
-
-
-
 
 def updateTimeLeft():
     numberOfItemsToPopOffTop = 0
@@ -312,9 +327,9 @@ def addBottomBarWithClock():
     #Add the overlay box to hide the redrawing
     fullBottomBar[0] = canvas.create_rectangle(0,heightOfScreen-115, widthOfScreen+10, heightOfScreen+10, fill="black")
     #Add the clock
-    fullBottomBar[1] = canvas.create_text(widthOfScreen-paddingAroundBoxes,heightOfScreen-paddingAroundBoxes,text='hh:mm', font=('Helvetica Neue UltraLight',70),fill="white",anchor='se', tag='time')
+    fullBottomBar[1] = canvas.create_text(widthOfScreen-paddingAroundBoxes-10,heightOfScreen-paddingAroundBoxes,text='hh:mm', font=('Helvetica Neue UltraLight',70),fill="white",anchor='se', tag='time')
     #Add the date
-    fullBottomBar[2] = canvas.create_text(paddingAroundBoxes,heightOfScreen-paddingAroundBoxes,text='dd/mm/yyyy', font=('Helvetica Neue UltraLight',70),fill="white",anchor='sw', tag='date')
+    fullBottomBar[2] = canvas.create_text(paddingAroundBoxes+10,heightOfScreen-paddingAroundBoxes,text='dd/mm/yyyy', font=('Helvetica Neue UltraLight',70),fill="white",anchor='sw', tag='date')
     canvas.tag_raise(fullBottomBar)
 
 def update_clock():
@@ -335,25 +350,19 @@ def update_clock():
     canvas.itemconfig(fullBottomBar[2],text=currentDate)
     window.after(1000,update_clock)
 
-
 def main():
     fetchNewDataForStation()
 
     addBottomBarWithClock()
     update_clock()
+    for i in range(0,4):
+        addNewItemWithData(entries[i]['lineNumber'],entries[i]['destination'],entries[i]['originStation'],getCorrectLineColor(entries[i]['lineNumber'],entries[i]['operator']),i)
 
-    addNewItemWithData(entries[0]['lineNumber'],entries[0]['destination'],entries[0]['originStation'],getCorrectLineColor(entries[0]['lineNumber'],entries[0]['operator']),0)
-    addNewItemWithData(entries[1]['lineNumber'],entries[1]['destination'],entries[1]['originStation'],getCorrectLineColor(entries[1]['lineNumber'],entries[1]['operator']),1)
-    addNewItemWithData(entries[2]['lineNumber'],entries[2]['destination'],entries[2]['originStation'],getCorrectLineColor(entries[2]['lineNumber'],entries[2]['operator']),2)
-    addNewItemWithData(entries[3]['lineNumber'],entries[3]['destination'],entries[3]['originStation'],getCorrectLineColor(entries[3]['lineNumber'],entries[3]['operator']),3)
 
     global entryBeingDisplayed
     entryBeingDisplayed = 0
 
     updateTimeLeft()
-
-
-
 
 if __name__ == "__main__":
     main()
