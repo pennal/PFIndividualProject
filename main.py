@@ -2,8 +2,11 @@
 import requests#Used to request the data from the APIs
 import json #Pretty print the incoming data
 import datetime
+import time
 from tkinter import *
 import sys
+
+import colorGenerator
 
 
 ########################################################################################################################
@@ -65,10 +68,15 @@ colorLinesTPL = {
 colorLinePosta = '#FEC213'
 colorLineSNL = '#0B255A'
 colorLinesARL = {
-    '461':'#FFEB04',
+    '461':'#FFE400',
     '441':'#3FB454',
     '60':'#9600F6'
 }
+
+
+
+
+
 
 entryBeingDisplayed = 0
 
@@ -76,9 +84,14 @@ fullBottomBar = ['','','']
 
 statusRed = '#CC0605'
 statusYellow = '#FFBE00'
-statusGreen = '#27E833'
+statusGreen = '#46BF00'
+yellowToRed = colorGenerator.linear_gradient(statusYellow,statusRed,40)['hex']#['#ffbe00', '#fdb900', '#fcb400', '#fbaf00', '#f9ab00', '#f8a600', '#f7a100', '#f59c00', '#f49801', '#f39301', '#f18e01', '#f08a01', '#ef8501', '#ee8001', '#ec7b01', '#eb7701', '#ea7202', '#e86d02', '#e76902', '#e66402', '#e45f02', '#e35a02', '#e25602', '#e05102', '#df4c03', '#de4803', '#dd4303', '#db3e03', '#da3903', '#d93503', '#d73003', '#d62b03', '#d52704', '#d32204', '#d21d04', '#d11804', '#cf1404', '#ce0f04', '#cd0a04', '#cc0605']
+
+greenToYellow = colorGenerator.linear_gradient(statusGreen,statusYellow,40)['hex']#['#27e833', '#2ce631', '#32e530', '#37e42f', '#3de32d', '#42e22c', '#48e12b', '#4de029', '#53df28', '#58de27', '#5edd25', '#63dc24', '#69db23', '#6fda22', '#74d820', '#7ad71f', '#7fd61e', '#85d51c', '#8ad41b', '#90d31a', '#95d218', '#9bd117', '#a0d016', '#a6cf14', '#abce13', '#b1cd12', '#b7cc11', '#bcca0f', '#c2c90e', '#c7c80d', '#cdc70b', '#d2c60a', '#d8c509', '#ddc407', '#e3c306', '#e8c205', '#eec103', '#f3c002', '#f9bf01', '#ffbe00']
+
 window = Tk()
-canvas = Canvas(window, width = widthOfScreen, height = heightOfScreen, bg = "black")
+window.title("Bus Schedule")
+canvas = Canvas(window, width = widthOfScreen, height = heightOfScreen, bg = "#1A1C19")
 canvas.pack()
 
 def getCorrectLineColor(lineNumber,company):
@@ -317,6 +330,19 @@ def deltaTime(timeOfDeparture):
         else:
             return str(res[0]) +'\''
 
+def changeColorFromYellowToRed(id):
+    for i in range(0,len(yellowToRed),1):
+        canvas.itemconfig(boundingBoxes[4+(id*6)],fill=yellowToRed[i])
+        canvas.update()
+        time.sleep(0.0050)
+
+def changeColorFromGreenToYellow(id):
+    for i in range(0,len(greenToYellow),1):
+        canvas.itemconfig(boundingBoxes[4+(id*6)],fill=greenToYellow[i])
+        canvas.update()
+        time.sleep(0.0050)
+
+
 def updateTimeLeft():
     numberOfItemsToPopOffTop = 0
     #Loop through the items currently displayed, and update the time for all of them
@@ -332,10 +358,21 @@ def updateTimeLeft():
             canvas.itemconfig(boundingBoxes[5+(itemDisplayed*6)],text='0')
             numberOfItemsToPopOffTop += 1
         elif newTimeLeft <= 1:
-            canvas.itemconfig(boundingBoxes[4+(itemDisplayed*6)],fill=statusRed)
+            if not (str(canvas.itemconfig(boundingBoxes[4+(itemDisplayed*6)])['fill'][4]).upper() == str(statusRed)):
+                print(str(canvas.itemconfig(boundingBoxes[4+(itemDisplayed*6)])['fill'][4]).upper() + " != " + statusRed)
+                print('\'' + str(canvas.itemconfig(boundingBoxes[4+(itemDisplayed*6)])['fill'][4]).upper() + '\'')
+                print('\'' + str(statusRed).upper() + '\'')
+                window.after(1,changeColorFromYellowToRed(itemDisplayed))
+
+            #canvas.itemconfig(boundingBoxes[4+(itemDisplayed*6)],fill=statusRed)
             canvas.itemconfig(boundingBoxes[5+(itemDisplayed*6)],text=str(newTimeLeftAsString))
         elif newTimeLeft <= 2:
-            canvas.itemconfig(boundingBoxes[4+(itemDisplayed*6)],fill=statusYellow)
+            if not (str(canvas.itemconfig(boundingBoxes[4+(itemDisplayed*6)])['fill'][4]).upper() == str(statusYellow)):
+                print(str(canvas.itemconfig(boundingBoxes[4+(itemDisplayed*6)])['fill'][4]).upper() + " != " + statusYellow)
+                print('\'' + str(canvas.itemconfig(boundingBoxes[4+(itemDisplayed*6)])['fill'][4]).upper() + '\'')
+                print('\'' + str(statusYellow).upper() + '\'')
+                window.after(1,changeColorFromGreenToYellow(itemDisplayed))
+
             canvas.itemconfig(boundingBoxes[5+(itemDisplayed*6)],text=str(newTimeLeftAsString))
         else:
             canvas.itemconfig(boundingBoxes[5+(itemDisplayed*6)],text=str(newTimeLeftAsString))
@@ -343,6 +380,7 @@ def updateTimeLeft():
     #Pop the item(s) to be deleted. We do it here to handle multiple ones at once
     for i in range(0,numberOfItemsToPopOffTop):
         eliminateTop()
+        #window.after(1,eliminateTop)
 
     global shouldFetchData
     if shouldFetchData == True:
