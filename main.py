@@ -26,7 +26,7 @@ import sys
 
 #GENERAL SETTINGS
 apiURL = 'http://transport.opendata.ch/v1/stationboard' #base URL for the api
-numberOfRequests = 30 #number of connections requested
+numberOfRequests = 15 #number of connections requested
 forStation = ['Ponte Madonnetta','Universita']
 
 
@@ -34,6 +34,7 @@ forStation = ['Ponte Madonnetta','Universita']
 #GLOBAL VARIABLES
 isIdle = True
 isBlinkTrue = True
+shouldFetchData = False
 entries = [] #Variable to hold all entries
 heightOfScreen = 1050
 widthOfScreen = 1680
@@ -72,7 +73,6 @@ colorLinesARL = {
 entryBeingDisplayed = 0
 
 fullBottomBar = ['','','']
-clock = 'hello'
 
 statusRed = '#CC0605'
 statusYellow = '#FFBE00'
@@ -145,17 +145,20 @@ def eliminateTop():
     as generating a new entry. The list containing all the indexes is also updated and truncated.
     :return: VOID
     """
+    global isIdle
     if isIdle == True:
-        global isIdle
         isIdle = False
         global boundingBoxes
         global entries
         global canvas
+        global shouldFetchData
         addNewItemWithData(entries[4]['lineNumber'],entries[4]['destination'],entries[4]['originStation'],getCorrectLineColor(entries[4]['lineNumber'],entries[4]['operator']),4)
+
         #Bring the bottom bar to the top of the view
         canvas.tag_raise(fullBottomBar[0])
         canvas.tag_raise(fullBottomBar[1])
         canvas.tag_raise(fullBottomBar[2])
+
         x = 0.5
         for i in range(40):
             for item in range(0,6):
@@ -183,18 +186,30 @@ def eliminateTop():
             canvas.update()
         #Remove from list of buses
         entries = entries[1:]
+
+        shouldFetchData = False
+
+        if len(entries) < 10:
+            print("fetching new data")
+            shouldFetchData = True
+
         isIdle = True
 
 def fetchNewDataForStation():
     global entries
-    #Create a temp dict to hold the data
+    #Create a temp list to hold the data
     temporaryEntries = []
     for station in range(0,len(forStation)):
         #remove all spaces from the name of the starting station
         forStationURL = forStation[station].replace(" ","%20")
+
+
         try:
             #Get the data from the URL
-            response = requests.get(apiURL + '?station=' + forStationURL + '&limit=' + str(numberOfRequests))
+            if len(entries) > 0:
+                response = requests.get(apiURL + '?station=' + forStationURL + '&limit=' + str(numberOfRequests) + "&datetime=" + str(entries[-1]["departureDate"]) + "%20" + str(entries[-1]["departureTime"][:-3]))
+            else:
+                response = requests.get(apiURL + '?station=' + forStationURL + '&limit=' + str(numberOfRequests))
         except:
             print("COULD NOT CONNECT TO THE NETWORK")
             sys.exit()
@@ -247,11 +262,23 @@ def fetchNewDataForStation():
 
     #Sort the dictionary by keys
     temporaryEntries = quickSortTime(temporaryEntries)
+    if len(entries) > 0:
+        for i in range(len(temporaryEntries)-1,-1,-1):
+            if temporaryEntries[i] == entries[-1]:
+                #print("Found it, entry: " + str(i))
+                #print("the following should be equal: " + str(temporaryEntries[i]) + " and " + str(entries[-1]))
+                actualEntry = i
+                break
 
 
+        for n in range(actualEntry+1,len(temporaryEntries)):
+            #print("Current index: " + str(n))
+            entries.append(temporaryEntries[n])
 
-    entries = temporaryEntries
+    else:
+        entries = temporaryEntries
 
+    print("Number of entries stored: " + str(len(entries)))
 
 
 
@@ -317,6 +344,10 @@ def updateTimeLeft():
     for i in range(0,numberOfItemsToPopOffTop):
         eliminateTop()
 
+    global shouldFetchData
+    if shouldFetchData == True:
+        fetchNewDataForStation()
+        shouldFetchData = False
 
     #Schedule the update after 10 seconds
     window.after(10000,updateTimeLeft)
