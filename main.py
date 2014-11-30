@@ -33,7 +33,7 @@ apiURL = 'http://transport.opendata.ch/v1/stationboard'
 #number of connections requested. This is the minimum value to be known to work correctly
 numberOfRequests = 15
 #Stations for which the buses are displayed. If only one is needed, still use a list!
-forStation = ['Ponte Madonnetta','Universita']
+forStation = ["Ponte Madonnetta"]#['Ponte Madonnetta','Universita']
 
 
 
@@ -97,12 +97,23 @@ statusGreen = '#46BF00'
 yellowToRed = colorGenerator.linear_gradient(statusYellow,statusRed,40)['hex']
 greenToYellow = colorGenerator.linear_gradient(statusGreen,statusYellow,40)['hex']
 
-#Create the main window
-window = Tk()
-window.title("Bus Schedule")
-canvas = Canvas(window, width = widthOfScreen, height = heightOfScreen, bg = "#1A1C19")
-canvas.pack()
+#Global variables for window and canvas. Initialized as zero, kind of a placeholder
+window = 0
+canvas = 0
 
+def initWindow():
+    """
+    Creates the main view. Called in main when the data has been fetched.
+    :return: VOID
+    """
+    global window
+    global canvas
+    #Create the main window
+    window = Tk()
+    window.title("Bus Schedule")
+    #Create the canvas where items are added
+    canvas = Canvas(window, width = widthOfScreen, height = heightOfScreen, bg = "#1A1C19")
+    canvas.pack()
 def getCorrectLineColor(lineNumber,company):
     """
     :param lineNumber:Line number of the bus in question
@@ -154,11 +165,13 @@ def addNewItemWithData(lineNumber,destination,origin,colorOfLine,position = 3):
     boundingBoxes.append(canvas.create_text(widthOfScreen-paddingAroundBoxes-110, paddingAroundBoxes+offset+100,text=correctTime, font=('Helvetica Neue UltraLight',100),fill="white",anchor='center', tag='timeLeft'))
 
 
-    #global fullBottomBar
-    #canvas.tag_raise(fullBottomBar)
-
-#TODO:Remove this, only for debugging purposes
 def eliminateTopWithKey(event):
+    """
+    ===== DEBUG =====
+    Invoked when the right arrow key is pressed. Used for debug purposes.
+    :param event: A Key (in this case right arrow) being pressed
+    :return: VOID
+    """
     eliminateTop()
 
 def eliminateTop():
@@ -182,7 +195,7 @@ def eliminateTop():
         canvas.tag_raise(fullBottomBar[1])
         canvas.tag_raise(fullBottomBar[2])
 
-
+        # Animation: Slide Out
         x = 0.5
         for i in range(40):
             for item in range(0,6):
@@ -193,6 +206,7 @@ def eliminateTop():
         #Remove the top entry from the list of active elements
         boundingBoxes = boundingBoxes[6:]
 
+        # Animation: Move up all remaining items as well as the new one
         for group in range(0,len(boundingBoxes)//6):
             i = 0
             x=0
@@ -211,12 +225,12 @@ def eliminateTop():
         #Remove from list of buses
         entries = entries[1:]
 
-        shouldFetchData = False
 
+        #Check if an update is needed
         if len(entries) < 10:
             print("fetching new data")
             shouldFetchData = True
-
+        #We set the idle switch to true so the GUI resumes updating
         isIdle = True
 
 def fetchNewDataForStation():
@@ -314,9 +328,9 @@ def fetchNewDataForStation():
 
 def quickSortTime(theEntries):
     """
-    Simple quick sort algorithm to sort the incoming data when more than 1 stop is requested
+    Simple quick sort algorithm to sort the incoming data when more than 1 stop is requested. Sorted by leaving time
     :param theEntries: list to be sorted, usually the bus entries
-    :return: sorted list.
+    :return: sorted list by departure time.
     """
     if len(theEntries) <= 1:
         return theEntries
@@ -345,12 +359,22 @@ def deltaTime(timeOfDeparture):
         return str(res[0]+1) +'\''
 
 def changeColorFromYellowToRed(id):
+    """
+    Animation for color transition
+    :param id: Id of the element for which the color has to be changed, and animated
+    :return: VOID
+    """
     for i in range(0,len(yellowToRed),1):
         canvas.itemconfig(boundingBoxes[4+(id*6)],fill=yellowToRed[i])
         canvas.update()
         time.sleep(0.0050)
 
 def changeColorFromGreenToYellow(id):
+    """
+    Animation for color transition
+    :param id: Id of the element for which the color has to be changed, and animated
+    :return: VOID
+    """
     for i in range(0,len(greenToYellow),1):
         canvas.itemconfig(boundingBoxes[4+(id*6)],fill=greenToYellow[i])
         canvas.update()
@@ -396,54 +420,66 @@ def updateTimeLeft():
     window.after(10000,updateTimeLeft)
 
 def addBottomBarWithClock():
+    """
+    Add a bar at the bottom with the current time and date. Usually called in the setting up phase
+    :return: VOID
+    """
     global fullBottomBar
-    global clock
+
     #Add the overlay box to hide the redrawing
     fullBottomBar[0] = canvas.create_rectangle(0,heightOfScreen-115, widthOfScreen+10, heightOfScreen+10, fill="black")
     #Add the clock
-    fullBottomBar[1] = canvas.create_text(widthOfScreen-paddingAroundBoxes-10,heightOfScreen-paddingAroundBoxes,text='hh:mm', font=('Helvetica Neue UltraLight',70),fill="white",anchor='se', tag='time')
+    fullBottomBar[1] = canvas.create_text(widthOfScreen-paddingAroundBoxes-10,heightOfScreen-paddingAroundBoxes+5,text='hh:mm', font=('Helvetica Neue UltraLight',70),fill="white",anchor='se', tag='time')
     #Add the date
-    fullBottomBar[2] = canvas.create_text(paddingAroundBoxes+10,heightOfScreen-paddingAroundBoxes,text='dd/mm/yyyy', font=('Helvetica Neue UltraLight',70),fill="white",anchor='sw', tag='date')
+    fullBottomBar[2] = canvas.create_text(paddingAroundBoxes+10,heightOfScreen-paddingAroundBoxes+5,text='dd/mm/yyyy', font=('Helvetica Neue UltraLight',70),fill="white",anchor='sw', tag='date')
     canvas.tag_raise(fullBottomBar)
 
 def update_clock():
+    """
+    Function to update the clock to always display the correct time. Done by asking the system for the actual time.
+    :return: VOID
+    """
     global fullBottomBar
     global isBlinkTrue
     #Get current time
     currentDate = datetime.datetime.now()
     stringOfTime = datetime.datetime.strftime(currentDate,"%H:%M %d/%m/%Y")
-
+    #split and get useful data
     currentTime = stringOfTime.split(" ")[0]
     currentDate = stringOfTime.split(" ")[1]
-
+    # Blinking colon
     if isBlinkTrue == False:
         currentTime = currentTime.replace(":"," ")
     isBlinkTrue = not isBlinkTrue
 
+    # Update the time and date
     canvas.itemconfig(fullBottomBar[1],text=currentTime)
     canvas.itemconfig(fullBottomBar[2],text=currentDate)
+    # Call with delay
     window.after(1000,update_clock)
 
 def main():
+    # First of all get the updated data
     fetchNewDataForStation()
-
+    # Create a window and canvas to display it all
+    initWindow()
+    # Add the bottom bar with the clock
     addBottomBarWithClock()
+    #Start the updating process for the clock
     update_clock()
+    # Add 4 items to the main view
     for i in range(0,4):
         addNewItemWithData(entries[i]['lineNumber'],entries[i]['destination'],entries[i]['originStation'],getCorrectLineColor(entries[i]['lineNumber'],entries[i]['operator']),i)
-
-
-    global entryBeingDisplayed
-    entryBeingDisplayed = 0
-
+    # Update the times left until departure
     updateTimeLeft()
 
 if __name__ == "__main__":
     main()
 
-#TODO:Remove this, only for debugging purposes
+#DEBUG: Used when trying the animations
 window.bind("<Right>", eliminateTopWithKey)
 
+# Enter the infinite loop
 window.mainloop()
 
 
