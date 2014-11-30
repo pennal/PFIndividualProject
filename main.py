@@ -1,12 +1,12 @@
 # -*- coding: utf-8 -*-
-import requests#Used to request the data from the APIs
-import json #Pretty print the incoming data
-import datetime
-import time
-from tkinter import *
-import sys
+import requests         #Used to request the data from the APIs
+import json             #Pretty print the incoming data
+import datetime         #Used to calculate the time left for a certain bus
+import time             #Used for some delays
+from tkinter import *   #All for the GUI
+import sys              #Used to abort the script
 
-import colorGenerator
+import colorGenerator   #Importing the file to generate color transitions
 
 
 ########################################################################################################################
@@ -28,25 +28,36 @@ import colorGenerator
 
 
 #GENERAL SETTINGS
-apiURL = 'http://transport.opendata.ch/v1/stationboard' #base URL for the api
-numberOfRequests = 15 #number of connections requested
+#base URL for the api
+apiURL = 'http://transport.opendata.ch/v1/stationboard'
+#number of connections requested. This is the minimum value to be known to work correctly
+numberOfRequests = 15
+#Stations for which the buses are displayed. If only one is needed, still use a list!
 forStation = ['Ponte Madonnetta','Universita']
 
 
 
 #GLOBAL VARIABLES
+#Is the main APP idle? Used to avoid overlapping events
 isIdle = True
+#Watch colon blink "counter", used to actually make the symbol blink
 isBlinkTrue = True
+#Trigger to fetch new data
 shouldFetchData = False
-entries = [] #Variable to hold all entries
+#Variable to hold all entries
+entries = []
+#Hardwired for now, should be fixed in a later version
 heightOfScreen = 1050
 widthOfScreen = 1680
+#Constants used to display the elements on the gui
 heightOfSingleEntryBox = 230
 paddingAroundBoxes = 20
 widthOfOutlineOfEntryBox = 5
-
+#Holds all the IDs for the GUI elements
 boundingBoxes = []
 
+#Defining colors for each of the companies. If you wish to add your own, use HEX notation
+#TPL color Dict
 colorLinesTPL = {
     '1': '#D53B81',
     '2':'#7D156A',
@@ -64,9 +75,11 @@ colorLinesTPL = {
     'F':'#009E8D',
     'S':'#F5BC1C'
 }
-
+#For the Autopostale we only need one color
 colorLinePosta = '#FEC213'
+#Same for the Societa nautica Lugano
 colorLineSNL = '#0B255A'
+#ARL color Dict
 colorLinesARL = {
     '461':'#FFE400',
     '441':'#3FB454',
@@ -74,21 +87,17 @@ colorLinesARL = {
 }
 
 
-
-
-
-
-entryBeingDisplayed = 0
-
+#List to hold all of the bottom bar's element IDs
 fullBottomBar = ['','','']
-
+#Define colors for the three different time states
 statusRed = '#CC0605'
 statusYellow = '#FFBE00'
 statusGreen = '#46BF00'
-yellowToRed = colorGenerator.linear_gradient(statusYellow,statusRed,40)['hex']#['#ffbe00', '#fdb900', '#fcb400', '#fbaf00', '#f9ab00', '#f8a600', '#f7a100', '#f59c00', '#f49801', '#f39301', '#f18e01', '#f08a01', '#ef8501', '#ee8001', '#ec7b01', '#eb7701', '#ea7202', '#e86d02', '#e76902', '#e66402', '#e45f02', '#e35a02', '#e25602', '#e05102', '#df4c03', '#de4803', '#dd4303', '#db3e03', '#da3903', '#d93503', '#d73003', '#d62b03', '#d52704', '#d32204', '#d21d04', '#d11804', '#cf1404', '#ce0f04', '#cd0a04', '#cc0605']
+#Lists containing all transition colors
+yellowToRed = colorGenerator.linear_gradient(statusYellow,statusRed,40)['hex']
+greenToYellow = colorGenerator.linear_gradient(statusGreen,statusYellow,40)['hex']
 
-greenToYellow = colorGenerator.linear_gradient(statusGreen,statusYellow,40)['hex']#['#27e833', '#2ce631', '#32e530', '#37e42f', '#3de32d', '#42e22c', '#48e12b', '#4de029', '#53df28', '#58de27', '#5edd25', '#63dc24', '#69db23', '#6fda22', '#74d820', '#7ad71f', '#7fd61e', '#85d51c', '#8ad41b', '#90d31a', '#95d218', '#9bd117', '#a0d016', '#a6cf14', '#abce13', '#b1cd12', '#b7cc11', '#bcca0f', '#c2c90e', '#c7c80d', '#cdc70b', '#d2c60a', '#d8c509', '#ddc407', '#e3c306', '#e8c205', '#eec103', '#f3c002', '#f9bf01', '#ffbe00']
-
+#Create the main window
 window = Tk()
 window.title("Bus Schedule")
 canvas = Canvas(window, width = widthOfScreen, height = heightOfScreen, bg = "#1A1C19")
@@ -165,12 +174,14 @@ def eliminateTop():
         global entries
         global canvas
         global shouldFetchData
+        #Add a new item out of the view
         addNewItemWithData(entries[4]['lineNumber'],entries[4]['destination'],entries[4]['originStation'],getCorrectLineColor(entries[4]['lineNumber'],entries[4]['operator']),4)
 
-        #Bring the bottom bar to the top of the view
+        #Bring the bottom bar to the top of the view. Done to give the effect of a slide in for the new entry
         canvas.tag_raise(fullBottomBar[0])
         canvas.tag_raise(fullBottomBar[1])
         canvas.tag_raise(fullBottomBar[2])
+
 
         x = 0.5
         for i in range(40):
@@ -212,34 +223,41 @@ def fetchNewDataForStation():
     global entries
     #Create a temp list to hold the data
     temporaryEntries = []
+    #Repeat for all input stations
     for station in range(0,len(forStation)):
         #remove all spaces from the name of the starting station
         forStationURL = forStation[station].replace(" ","%20")
 
 
-        try:
-            #Get the data from the URL
-            if len(entries) > 0:
-                response = requests.get(apiURL + '?station=' + forStationURL + '&limit=' + str(numberOfRequests) + "&datetime=" + str(entries[-1]["departureDate"]) + "%20" + str(entries[-1]["departureTime"][:-3]))
-            else:
-                response = requests.get(apiURL + '?station=' + forStationURL + '&limit=' + str(numberOfRequests))
-        except:
-            print("COULD NOT CONNECT TO THE NETWORK")
-            sys.exit()
-        #DEBUG: Pretty print the incoming data
-        #print(response.text)
-        data = json.loads(response.text)
-        try:
-            amountOfData = len(data["stationboard"])
-        except KeyError:
-            print("Error: Could not find key. Might be a timeout issue, reopen the program")
-            sys.exit()
-        except:
-            print("Unknown error occured")
-            sys.exit()
+        hasTimedOut = True
+        #While the text returned is a timeout, continue trying
+        while hasTimedOut:
+            try:
+                #Get the data from the URL
+                if len(entries) > 0: #If this is an update to the previously existing data
+                    response = requests.get(apiURL + '?station=' + forStationURL + '&limit=' + str(numberOfRequests) + "&datetime=" + str(entries[-1]["departureDate"]) + "%20" + str(entries[-1]["departureTime"][:-3]))
+                else: #New data, program just started
+                    response = requests.get(apiURL + '?station=' + forStationURL + '&limit=' + str(numberOfRequests))
+                #Formath the incoming data as plaintext
+
+                data = json.loads(response.text)
+                #Check if what was returned is actually a timeout issue
+                if "errors" in data:
+                    if "Connection timed out" in data["errors"][0]["message"]:
+                        hasTimedOut = True
+                        print("Connection timed out. Retrying...")
+                else:
+                    hasTimedOut = False
+            except ConnectionError:
+                print("ConnectionError: Check your internet connection, and retry")
+                sys.exit()
+            except:
+                print("UnknownError: An unknown error has occured")
+                sys.exit()
+
 
         #Clean up the data, and extract all we need
-        for entry in range(0,amountOfData):
+        for entry in range(0,len(data["stationboard"])):
             originStation = data["station"]["name"]
             destination = data["stationboard"][entry]["to"]
             lineNumber = data["stationboard"][entry]["number"]
@@ -247,9 +265,6 @@ def fetchNewDataForStation():
             departureTimeTemp = data["stationboard"][entry]["stop"]["departure"].split("T")
             departureDate = departureTimeTemp[0]
             departureTime = departureTimeTemp[1].split("+")[0]#Remove the greenwich delta
-
-            #TODO: Find the difference in time (timeDelta)
-            timeDelta = 60
 
             datetime.datetime.strptime(departureTime, "%H:%M:%S")
 
@@ -269,12 +284,13 @@ def fetchNewDataForStation():
                 'departureDate':departureDate,
                 'possibleDelays':possibleDelays,
                 'typeOfTransport':typeOfTransport,
-                'operator':operator,
-                'timeDelta':timeDelta
+                'operator':operator
             })
 
     #Sort the dictionary by keys
     temporaryEntries = quickSortTime(temporaryEntries)
+
+    #Find the entries that have to be added to the preexisting ones
     if len(entries) > 0:
         for i in range(len(temporaryEntries)-1,-1,-1):
             if temporaryEntries[i] == entries[-1]:
@@ -286,21 +302,22 @@ def fetchNewDataForStation():
 
         for n in range(actualEntry+1,len(temporaryEntries)):
             #print("Current index: " + str(n))
-            entries.append(temporaryEntries[n])
+            try:
+                entries.append(temporaryEntries[n])
+            except:
+                print("Error while adding entry number " + str(n) + " to the entries list.")
 
     else:
         entries = temporaryEntries
 
     print("Number of entries stored: " + str(len(entries)))
 
-
-
-
-def sortByTime():
-    global entries
-    entries = quickSortTime(entries)
-
 def quickSortTime(theEntries):
+    """
+    Simple quick sort algorithm to sort the incoming data when more than 1 stop is requested
+    :param theEntries: list to be sorted, usually the bus entries
+    :return: sorted list.
+    """
     if len(theEntries) <= 1:
         return theEntries
     pivotVal = theEntries.pop()
@@ -325,10 +342,7 @@ def deltaTime(timeOfDeparture):
     if res[0] > 59: #More than an hour
             return str(res[0]//60) + 'h'
     else: #If time left is less than an hour
-        if res[1] > 45:
-            return str(res[0]+1) +'\''
-        else:
-            return str(res[0]) +'\''
+        return str(res[0]+1) +'\''
 
 def changeColorFromYellowToRed(id):
     for i in range(0,len(yellowToRed),1):
@@ -359,20 +373,11 @@ def updateTimeLeft():
             numberOfItemsToPopOffTop += 1
         elif newTimeLeft <= 1:
             if not (str(canvas.itemconfig(boundingBoxes[4+(itemDisplayed*6)])['fill'][4]).upper() == str(statusRed)):
-                print(str(canvas.itemconfig(boundingBoxes[4+(itemDisplayed*6)])['fill'][4]).upper() + " != " + statusRed)
-                print('\'' + str(canvas.itemconfig(boundingBoxes[4+(itemDisplayed*6)])['fill'][4]).upper() + '\'')
-                print('\'' + str(statusRed).upper() + '\'')
                 window.after(1,changeColorFromYellowToRed(itemDisplayed))
-
-            #canvas.itemconfig(boundingBoxes[4+(itemDisplayed*6)],fill=statusRed)
             canvas.itemconfig(boundingBoxes[5+(itemDisplayed*6)],text=str(newTimeLeftAsString))
         elif newTimeLeft <= 2:
             if not (str(canvas.itemconfig(boundingBoxes[4+(itemDisplayed*6)])['fill'][4]).upper() == str(statusYellow)):
-                print(str(canvas.itemconfig(boundingBoxes[4+(itemDisplayed*6)])['fill'][4]).upper() + " != " + statusYellow)
-                print('\'' + str(canvas.itemconfig(boundingBoxes[4+(itemDisplayed*6)])['fill'][4]).upper() + '\'')
-                print('\'' + str(statusYellow).upper() + '\'')
                 window.after(1,changeColorFromGreenToYellow(itemDisplayed))
-
             canvas.itemconfig(boundingBoxes[5+(itemDisplayed*6)],text=str(newTimeLeftAsString))
         else:
             canvas.itemconfig(boundingBoxes[5+(itemDisplayed*6)],text=str(newTimeLeftAsString))
