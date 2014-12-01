@@ -33,7 +33,7 @@ apiURL = 'http://transport.opendata.ch/v1/stationboard'
 #number of connections requested. This is the minimum value to be known to work correctly
 numberOfRequests = 15
 #Stations for which the buses are displayed. If only one is needed, still use a list!
-forStation = ["Ponte Madonnetta"]#['Ponte Madonnetta','Universita']
+forStation = ['Lugano Centro']#['Ponte Madonnetta','Universita']
 
 
 
@@ -157,12 +157,29 @@ def addNewItemWithData(lineNumber,destination,origin,colorOfLine,position = 3):
     boundingBoxes.append(canvas.create_text(250,12+offset,text=destination, font=('Helvetica Neue UltraLight',90),fill="white",anchor='nw', tag='destination'))
     #Station of origin
     boundingBoxes.append(canvas.create_text(250,230+offset,text=origin, font=('Helvetica Neue UltraLight',70),fill="white",anchor='sw', tag='leavingStation'))
-    #Circle with the status
-    boundingBoxes.append(canvas.create_oval(widthOfScreen-paddingAroundBoxes-210, paddingAroundBoxes+offset+10, widthOfScreen-paddingAroundBoxes-10, 220+offset, fill=statusGreen))
     #Time left
-    correctTime = deltaTime(datetime.datetime.strptime(entries[position]['departureTime'] + " " + entries[position]['departureDate'],"%H:%M:%S %Y-%m-%d"))
+    correctTimeTemp = deltaTime(datetime.datetime.strptime(entries[position]['departureTime'] + " " + entries[position]['departureDate'],"%H:%M:%S %Y-%m-%d"))
+
+
+    if '\'' in correctTimeTemp:
+        correctTime = int(correctTimeTemp[:-1])
+    elif 'h' in correctTimeTemp:
+        correctTime = 60 #Dummy value
+
+    #Get correct color
+    if correctTime <= 1:
+        correctColor = statusRed
+    elif correctTime <= 2:
+        correctColor = statusYellow
+    else:
+        correctColor = statusGreen
+
+
+    #Circle with the status
+    boundingBoxes.append(canvas.create_oval(widthOfScreen-paddingAroundBoxes-210, paddingAroundBoxes+offset+10, widthOfScreen-paddingAroundBoxes-10, 220+offset, fill=correctColor))
+
     #Add the time left inside the circle
-    boundingBoxes.append(canvas.create_text(widthOfScreen-paddingAroundBoxes-110, paddingAroundBoxes+offset+100,text=correctTime, font=('Helvetica Neue UltraLight',100),fill="white",anchor='center', tag='timeLeft'))
+    boundingBoxes.append(canvas.create_text(widthOfScreen-paddingAroundBoxes-110, paddingAroundBoxes+offset+100,text=correctTimeTemp, font=('Helvetica Neue UltraLight',100),fill="white",anchor='center', tag='timeLeft'))
 
 
 def eliminateTopWithKey(event):
@@ -234,6 +251,10 @@ def eliminateTop():
         isIdle = True
 
 def fetchNewDataForStation():
+    """
+    Fetches new data from the internet
+    :return: VOID
+    """
     global entries
     #Create a temp list to hold the data
     temporaryEntries = []
