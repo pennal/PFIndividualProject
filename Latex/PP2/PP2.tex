@@ -1,0 +1,63 @@
+\documentclass[a4paper]{article}
+\usepackage[utf8]{inputenc}
+\usepackage{tikz}
+\usepackage[top=3cm,left=3cm,right=3cm,bottom=3cm]{geometry}
+
+
+
+\title{Programming Fundamentals I - Personal Project}
+\author{Report 2 - Pennati Lucas}
+
+
+
+\begin{document}
+\maketitle
+\section{Main Logic of the Program}
+The program, as has been planned, should behave along these guidelines:
+\begin{enumerate}
+\item Initiate the GUI, and load all the settings
+\item If all goes well, fetch the most up to date data. Otherwise throw an exception
+\item Once the data has been fetched, process it and strip away the information that is not needed. 
+\item Call the drawing function. This will add the first four entries to the GUI.
+\item Start a timer to call the updating function. This takes care of refreshing the information stored every $x$ seconds.
+\begin{enumerate}
+\item If the times left before the buses are greater than 0, do nothing, simply update the time left
+\item if the time left is zero, pop the first item away, and add the next one to the GUI. 
+\end{enumerate}
+\item Check if there is any updated information for the buses:
+\begin{enumerate}
+\item If yes, download the new data, and merge it with the existing one
+\item If no, simply do nothing
+\end{enumerate}
+\item Repeat the last 2 steps indefinitely, or until interrupted by the user
+\end{enumerate}
+\section{Intended Data Structures}
+There are a few data structures that are going to be used, but mostly the following ones:
+\begin{itemize}
+\item Lists: A variety of lists are going to be used, mostly to access the IDs of the GUI elements. This allows for a very specific addressing, as well as simple mathematical operations when having to eliminate multiple items off the view.
+\item Dictionaries: Mostly used in conjunction with lists, they allow a very simple addressing by using a descriptive key, making it easy to know what has to be extracted. 
+\end{itemize}
+\section{Functions to implement}
+\begin{itemize}
+\item Fetch new data\\
+This function is a very important as it deals with fetching as well as cleaning the data. It should be designed with only one parameter, a list of stops. This allows the user to specify multiple stops to be watched. It should return a list containing dictionaries for each of the leaving buses. 
+
+\item Add item to the GUI\\
+This functions should make it easier to add an item to the view, by taking the parameters needed and adjusting by itself the coordinates as well as colors or text sizes. 
+
+\item Update after time $x$\\
+This function should handle updating the time remaining before a bus leaves, as well as deciding if the top item has to be deleted. It should call itself after a time $x$ without stopping the rest of the program, through something like queuing. 
+
+\item Other functions\\
+The ones described here are the main ones. There will be a handful of helper ones, to make it easier to implement certain features, as well as keep the repeated code to a minimum.
+
+\end{itemize}
+
+
+\end{document}
+
+
+
+
+
+

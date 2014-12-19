@@ -33,7 +33,7 @@ apiURL = 'http://transport.opendata.ch/v1/stationboard'
 #number of connections requested. This is the minimum value to be known to work correctly
 numberOfRequests = 15
 #Stations for which the buses are displayed. If only one is needed, still use a list!
-forStation = ['Lugano Centro']#['Ponte Madonnetta','Universita']
+forStation = ['Lugano centro']
 
 
 
